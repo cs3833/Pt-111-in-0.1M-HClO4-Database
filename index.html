@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pt(111) Data Viewer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js"></script>
+<style>
+:root{
+  --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1b;--muted:#6b6b66;--border:#deded9;
+  --accent:#2f5d8a;--accent-soft:#e6eef6;--warn:#9a5b00;--grid:#e9e9e4;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#161616;--panel:#1f1f1f;--text:#ececea;--muted:#9a9a95;--border:#333331;
+  --accent:#7fb0e0;--accent-soft:#22303d;--warn:#e0a34a;--grid:#2c2c2a;
+}}
+:root[data-theme="dark"]{
+  --bg:#161616;--panel:#1f1f1f;--text:#ececea;--muted:#9a9a95;--border:#333331;
+  --accent:#7fb0e0;--accent-soft:#22303d;--warn:#e0a34a;--grid:#2c2c2a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:600}
+header span{color:var(--muted);font-size:13px}
+main{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 52px)}
+aside{border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.controls{padding:12px 16px;border-bottom:1px solid var(--border);display:grid;gap:10px}
+.seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;color:var(--text);padding:7px;cursor:pointer;font:inherit}
+.seg button.on{background:var(--accent);color:var(--panel);font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row label{font-size:12px;color:var(--muted)}
+select,input[type=search]{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:5px 7px}
+input[type=search]{width:100%}
+.btn{font:inherit;font-size:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:5px;padding:4px 9px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.check{display:flex;gap:6px;align-items:center;font-size:13px}
+#list{overflow:auto;flex:1;padding:4px 0}
+.item{display:grid;grid-template-columns:18px 1fr;gap:8px;padding:6px 16px;cursor:pointer;border-left:3px solid transparent}
+.item:hover{background:var(--accent-soft)}
+.item input{margin-top:3px}
+.item .k{font-weight:600;font-variant-numeric:tabular-nums}
+.item .m{color:var(--muted);font-size:12px}
+.item .w{color:var(--warn);font-size:12px}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.filters label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+.filters select{width:100%;min-width:0}
+.filters .span2{grid-column:1 / -1}
+.unitRow{display:flex;flex-direction:column;align-items:stretch;gap:3px;font-size:12px;color:var(--muted)}
+.seg.small{flex:1}
+.seg.small button{padding:5px 4px;font-size:13px;white-space:nowrap}
+#resetF{justify-self:start}
+#chips{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-start;min-height:46px}
+.chipsLabel{font-size:12px;color:var(--muted);padding-top:4px;white-space:nowrap}
+#chipList{display:flex;flex-wrap:wrap;gap:6px;max-height:96px;overflow:auto}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:2px 4px 2px 9px;font-size:12px;font-variant-numeric:tabular-nums}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:0 4px;border-radius:50%}
+.chip button:hover{color:var(--text);background:var(--accent-soft)}
+.empty{font-size:12px;color:var(--muted);padding-top:4px}
+input[type=number]{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:4px 6px;width:64px}
+.item .f{color:#c0392b;font-size:12px}
+dialog#info{border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);padding:0;width:min(560px,calc(100vw - 32px));box-shadow:0 12px 40px rgba(0,0,0,.25)}
+dialog#info::backdrop{background:rgba(0,0,0,.3)}
+.dhead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.dhead i{width:12px;height:12px;border-radius:50%;flex:none}
+.dhead h2{font-size:16px;margin:0;flex:1}
+.x{border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+#dBody{padding:12px 16px;max-height:60vh;overflow:auto}
+#dBody .ttl{font-weight:600;margin:0 0 4px}
+#dBody .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+#dBody dl{display:grid;grid-template-columns:150px 1fr;gap:5px 12px;margin:0;font-size:13px}
+#dBody dt{color:var(--muted)}
+#dBody dd{margin:0;word-break:break-word}
+#dBody a{color:var(--accent)}
+.dalpha{display:flex;gap:10px;align-items:center;padding:0 16px 12px;font-size:13px;color:var(--muted)}
+.dalpha input{flex:1}
+.dfoot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
+.dfoot a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.btn.danger{border-color:#c0392b;color:#c0392b}
+.btn.danger:hover{background:#c0392b;color:#fff}
+.chip .lbl,.item .lbl{cursor:pointer}
+.item .lbl:hover{text-decoration:underline;color:var(--accent)}
+.chip .lbl:hover{text-decoration:underline}
+.linkRow{font-weight:600}
+.jlRow{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+#count{font-size:12px;color:var(--muted)}
+section{display:flex;flex-direction:column;min-width:0;min-height:0}
+#plots{flex:1;display:block;min-height:0;overflow:auto}
+.pwrap{display:block}
+.pwrap[hidden]{display:none}
+.pwrap + .pwrap{border-top:1px solid var(--border)}
+.ptitle{padding:8px 16px 0;font-size:12px;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.ptitle .pt{flex:1;min-width:200px}
+.ptitle .pt b{color:var(--text);font-weight:600}
+.csvBtn{padding:3px 8px}
+.ptitle input[type=range]{width:110px;vertical-align:middle}
+.pl{width:100%}
+.hlegend{max-height:150px;overflow:auto;margin:0 16px 12px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:2px 12px;font-size:12px}
+.hlegend[hidden]{display:none}
+.hlegend span{display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hlegend span:hover{color:var(--accent)}
+.hlegend i{width:9px;height:9px;border-radius:50%;flex:none}
+.divider{width:calc(100% - 32px);background:none;border:0;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:12px;margin:18px 16px 6px;color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.divider::before,.divider::after{content:"";flex:1;border-top:2px solid var(--border)}
+.divider[hidden]{display:none}
+.divider:hover{color:var(--text)}
+.divLbl{text-align:center}
+.divsub{font-weight:400;text-transform:none;letter-spacing:0}
+#status{padding:6px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
+@media (max-width:800px){
+  main{grid-template-columns:1fr;height:auto}
+  aside{border-right:0;border-bottom:1px solid var(--border);max-height:none}
+  #list{max-height:45vh}
+  section{min-height:100vh}
+  #plots{overflow:visible}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Pt(111) in 0.1 M HClO₄ — data viewer</h1>
+  <span>Digitized literature CVs and ORR polarization curves</span>
+</header>
+<main>
+<aside>
+  <div class="controls">
+    <label class="check linkRow"><input type="checkbox" id="linked"> Link CVs and pol curves (removing one removes the other)</label>
+    <div class="seg" id="typeSeg">
+      <button data-t="cv" class="on">CVs</button>
+      <button data-t="pol">Pol curves</button>
+    </div>
+    <input type="search" id="search" placeholder="Search ds_key, author, year, title…">
+    <div class="filters">
+      <label>Author<select id="f_author"></select></label>
+      <label>Year<select id="f_year"></select></label>
+      <label class="span2">DOI<select id="f_doi"></select></label>
+      <div class="span2 unitRow"><span>Plot current in</span>
+        <div class="seg small" id="unitSeg"><button data-u="uA">µA/cm²</button><button data-u="mA">mA/cm²</button><button data-u="sqrt" class="polOnly" title="mA/cm² ÷ √rpm">÷ √rpm</button><button data-u="jlim" class="polOnly" title="j ÷ |j_lim|">j/|j_lim|</button></div>
+      </div>
+      <div class="span2 jlRow" id="jlRow">j_lim = average from <input type="number" id="jlA" value="0.4" step="0.05"> to <input type="number" id="jlB" value="0.6" step="0.05"> V vs RHE</div>
+      <label>Scan rate<select id="f_scan"></select></label>
+      <label class="polOnly">rpm<select id="f_rpm"></select></label>
+    </div>
+    <button class="btn" id="resetF">Reset filters</button>
+    <div class="row cvOnly" id="boundsRow">
+      <label for="jmin">Exclude CVs if max current density &lt;</label><input type="number" id="jmin" value="10" step="5">
+      <label for="jmax">or &gt;</label><input type="number" id="jmax" value="200" step="10"><label>µA/cm²</label>
+    </div>
+    <div class="row cvOnly">
+      <label for="emax">Exclude CVs if max potential &gt;</label><input type="number" id="emax" value="1.05" step="0.05"><label>V vs RHE</label>
+    </div>
+    <label class="check cvOnly"><input type="checkbox" id="withPol"> Only datasets with pol curve data</label>
+    <label class="check"><input type="checkbox" id="hideOdd"> Hide excluded datasets from the list</label>
+    <div class="row">
+      <span id="count"></span>
+    </div>
+  </div>
+  <div id="list"></div>
+</aside>
+<section>
+  <div id="plots">
+    <div id="topBox"></div>
+    <button id="div_rem" class="divider" aria-expanded="false"><span class="divLbl"></span></button>
+    <div id="box_rem" hidden></div>
+    <button id="div_crit" class="divider" hidden aria-expanded="false"><span class="divLbl"></span></button>
+    <div id="box_crit" hidden></div>
+  </div>
+  <div id="status">Loading metadata…</div>
+</section>
+<dialog id="info">
+  <div class="dhead"><i id="dColor"></i><h2 id="dTitle"></h2><button class="x" id="dClose" aria-label="Close">×</button></div>
+  <div id="dBody"></div>
+  <div class="dalpha"><label for="dAlpha">Opacity of this dataset</label><input type="range" id="dAlpha" min="0.05" max="1" step="0.05"><span id="dAlphaV"></span></div>
+  <div class="dfoot">
+    <a class="btn" id="dFile" download>Download CSV</a>
+    <button class="btn danger" id="dExclude">Remove from main plot</button>
+  </div>
+</dialog>
+</main>
+
+<script>
+const CV_DIR = 'CV_Data/';
+const POL_DIR = 'Pol_Curve_Data/';
+// Fallback when the page is opened outside the repo (preview, local file)
+const REMOTE = 'https://raw.githubusercontent.com/cs3833/Pt-111-in-0.1M-HClO4-Database/main/';
+let BASE = '';
+async function getText(path){
+  if (window.EMBEDDED && path in window.EMBEDDED) return window.EMBEDDED[path];
+  const url = BASE + encodeURI(path);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(r.status);
+  return r.text();
+}
+
+let meta = [], type = 'cv';
+const selected = {cv: new Set(), pol: new Set()};
+const cache = new Map();
+
+const $ = id => document.getElementById(id);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+const PALETTE = ['#2f6db3','#d1603d','#3a9a5b','#8e5bb5','#c23b6e','#2a9bb0','#b08a1e','#5a6b7a',
+  '#e08a2c','#4f8f2f','#7b4fd1','#b3473a','#1f7f86','#a56aa0','#6b8f00','#8a5a2b'];
+
+function num(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
+function isRHE(u){ return /^V vs RHE$/i.test((u||'').trim()); }
+function isAreal(u){ return /^(u|µ|m)A\/cm\^?2$/i.test((u||'').trim()); }
+
+// File for a metadata row
+function fileFor(r, t){
+  const n = r.dataset_number;
+  if (t === 'cv') return CV_DIR + 'CV' + n + '.csv';
+  const multi = meta.filter(m => m.dataset_number === n && m.pol_n_points).length > 1;
+  return POL_DIR + 'PolCurve' + n + (multi ? '-' + r.prep : '') + '.csv';
+}
+
+// One entry per CV (by dataset number) or per pol curve (by ds_key)
+function entries(t = type){
+  if (t === 'cv'){
+    const seen = new Set(), out = [];
+    for (const r of meta){
+      if (!r.cv_n_points || seen.has(r.dataset_number)) continue;
+      seen.add(r.dataset_number);
+      out.push({id:'CV'+r.dataset_number, label:'CV' + r.dataset_number, r,
+        xu:r.cv_x_units, yu:r.cv_y_units, scan:r.cv_scan_rate_mV_s, rpm:null});
+    }
+    return out;
+  }
+  return meta.filter(r => r.pol_n_points).map(r => ({id:r.ds_key, label:r.ds_key, r,
+    xu:r.pol_x_units, yu:r.pol_y_units, scan:r.pol_scan_rate_mV_s, rpm:r.pol_rpm}));
+}
+
+function firstAuthor(a){ return (a||'').split(';')[0].split(',')[0].trim(); }
+
+function authorsOf(r){ return (r.authors||'').split(';').map(x => x.trim()).filter(Boolean); }
+
+// Filter definitions: id -> how to read value(s) from an entry
+const FILTERS = {
+  f_author: {get: e => authorsOf(e.r), sort: 'alpha'},
+  f_year:   {get: e => e.r.year ? [String(e.r.year)] : [], sort: 'num'},
+  f_doi:    {get: e => e.r.doi ? [e.r.doi] : [], sort: 'doi'},
+  f_scan:   {get: e => num(e.scan) !== null ? [String(num(e.scan))] : [], sort: 'num', unit: 'mV/s'},
+  f_rpm:    {get: e => num(e.rpm) !== null ? [String(num(e.rpm))] : [], sort: 'num', unit: 'rpm', pol: true},
+};
+
+function filtered(t = type){
+  const q = $('search').value.toLowerCase().trim(), odd = $('hideOdd').checked, wp = $('withPol').checked;
+  return entries(t).filter(e => {
+    for (const [id, f] of Object.entries(FILTERS)){
+      if (f.pol && t !== 'pol') continue;
+      const v = $(id).value;
+      if (v && !f.get(e).includes(v)) return false;
+    }
+    if (odd && flagged(e)) return false;
+    if (t === 'cv' && wp && !hasPol.has(e.r.dataset_number)) return false;
+    if (!q) return true;
+    return [e.label, e.r.authors, e.r.year, e.r.title, e.r.journal, e.r.doi].join(' ').toLowerCase().includes(q);
+  });
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+function refreshFilters(){
+  const es = entries();
+  const doiLabel = {};
+  es.forEach(e => { if (e.r.doi) doiLabel[e.r.doi] = [firstAuthor(e.r.authors), e.r.year].filter(Boolean).join(' ') + ' — ' + e.r.doi; });
+  for (const [id, f] of Object.entries(FILTERS)){
+    const counts = new Map();
+    es.forEach(e => new Set(f.get(e)).forEach(v => counts.set(v, (counts.get(v)||0) + 1)));
+    let vals = [...counts.keys()];
+    if (f.sort === 'num') vals.sort((a,b) => a - b);
+    else if (f.sort === 'doi') vals.sort((a,b) => doiLabel[a].localeCompare(doiLabel[b]));
+    else vals.sort((a,b) => a.localeCompare(b));
+    const el = $(id), cur = el.value;
+    el.innerHTML = `<option value="">All (${vals.length})</option>` + vals.map(v => {
+      const text = f.sort === 'doi' ? doiLabel[v] : (f.unit ? `${v} ${f.unit}` : v);
+      return `<option value="${esc(v)}">${esc(text)} (${counts.get(v)})</option>`;
+    }).join('');
+    el.value = vals.includes(cur) ? cur : '';
+  }
+  document.querySelectorAll('.polOnly').forEach(el => el.style.display = type === 'pol' ? '' : 'none');
+  document.querySelectorAll('.cvOnly').forEach(el => el.style.display = type === 'cv' ? '' : 'none');
+}
+
+// Stable colors per selected dataset
+const colorOf = {cv: new Map(), pol: new Map()};
+function addSel(id){
+  if (selected[type].has(id)) return;
+  selected[type].add(id);
+  const used = new Set(colorOf[type].values());
+  let c = PALETTE.find(p => !used.has(p)) || PALETTE[colorOf[type].size % PALETTE.length];
+  colorOf[type].set(id, c);
+}
+function removeSel(id){ selected[type].delete(id); colorOf[type].delete(id); }
+// Plotted = everything passing the filters, minus datasets unticked by hand
+const unticked = {cv: new Set(), pol: new Set()};
+function syncSel(){
+  const want = new Set(filtered().map(e => e.id).filter(id => !unticked[type].has(id)));
+  for (const id of [...selected[type]]) if (!want.has(id)) removeSel(id);
+  for (const id of want) addSel(id);
+}
+
+function renderChips(){
+  if (!$('chipList')) return;
+  const byId = Object.fromEntries(entries().map(e => [e.id, e]));
+  const ids = [...selected[type]];
+  $('chipList').innerHTML = ids.length ? ids.map(id => {
+    const e = byId[id];
+    return `<span class="chip" title="${esc(e ? e.r.title : '')}"><i style="background:${colorOf[type].get(id)}"></i><span class="lbl" data-info="${esc(id)}">${esc(id)} · ${esc(e ? firstAuthor(e.r.authors) + ' ' + (e.r.year||'') : '')}</span><button data-rm="${esc(id)}" aria-label="Remove ${esc(id)}">×</button></span>`;
+  }).join('') : '<span class="empty">nothing selected</span>';
+}
+
+function renderList(){
+  killedCache = null;
+  syncSel();
+  renderChips();
+  const es = filtered(), sel = selected[type];
+  const nf = type === 'cv' ? entries().filter(flagged).length : 0;
+  $('count').textContent = `${es.length} shown · ${sel.size} plotted` + (nf ? ` · ${nf} excluded` : '') + (type==='cv' && !maxReady ? ' · checking currents…' : '');
+  $('list').innerHTML = es.map(e => {
+    const bits = [e.scan && `${num(e.scan)} mV/s`, e.rpm && `${num(e.rpm)} rpm`, `${e.xu}, ${e.yu}`].filter(Boolean).join(' · ');
+    const rs = reason(e), warn = rs ? `<div class="f">Excluded: ${esc(REASON_TEXT(rs, e))}</div>` : (linkedOut(e) && !manualOut[type].has(e.id)) ? `<div class="f">Removed: ${LINK_TEXT()}</div>` : '';
+    return `<label class="item"><input type="checkbox" data-id="${e.id}" ${sel.has(e.id)?'checked':''}>
+      <div><div class="k"><span class="lbl" data-info="${e.id}">${e.label}</span> <span class="m">${firstAuthor(e.r.authors)} ${e.r.year||''}</span></div>
+      <div class="m">${bits}</div>${warn}</div></label>`;
+  }).join('');
+}
+
+async function load(path){
+  if (cache.has(path)) return cache.get(path);
+  const p = getText(path)
+    .then(txt => {
+      const rows = Papa.parse(txt.replace(/^﻿/, ''), {skipEmptyLines:true}).data;
+      const x = [], y = [];
+      for (const row of rows.slice(1)){ const a = num(row[0]), b = num(row[1]); if (a!==null && b!==null){ x.push(a); y.push(b); } }
+      return {x, y};
+    });
+  cache.set(path, p);
+  return p;
+}
+
+const dispMode = {cv: 'uA', pol: 'mA'};
+const baseUnit = () => dispMode[type] === 'uA' ? 'uA' : 'mA';
+function targetUnit(){ return baseUnit() === 'uA' ? 'µA/cm²' : 'mA/cm²'; }
+function syncUnitSeg(){ document.querySelectorAll('#unitSeg button').forEach(b => b.classList.toggle('on', b.dataset.u === dispMode[type])); }
+// Can this dataset be put on the common axis? Needs V vs RHE and current per cm².
+function convertible(e){ return isRHE(e.xu) && isAreal(e.yu); }
+// Max current per CV (in µA/cm²), computed once after load
+const maxJ = new Map(), maxE = new Map();
+const hasPol = new Set();
+let maxReady = false;
+async function computeMaxJ(){
+  const cvs = entries('cv');
+  await Promise.all(cvs.map(async e => {
+    if (!convertible(e)) return;
+    try{
+      const d = await load(fileFor(e.r, 'cv'));
+      const f = /^ma\/cm/i.test((e.yu||'').trim()) ? 1000 : 1;
+      let m = -Infinity; for (const v of d.y) if (v > m) m = v;
+      maxJ.set(e.id, m * f);
+      let mx = -Infinity; for (const v of d.x) if (v > mx) mx = v;
+      maxE.set(e.id, mx);
+    }catch(err){}
+  }));
+  maxReady = true;
+}
+// Why a dataset is kept off the main plot (null = goes on main plot)
+function normMode(){ return type === 'pol' && (dispMode.pol === 'sqrt' || dispMode.pol === 'jlim') ? dispMode.pol : ''; }
+function isJlim(u){ return /j\s*\/\s*j_?lim/i.test(u || ''); }
+function syncNorm(){ $('jlRow').style.display = (normMode() === 'jlim') ? '' : 'none'; }
+// y-axis name and unit for the current display/normalization settings
+function yLabel(){
+  const tu = targetUnit(), n = normMode();
+  if (n === 'sqrt') return {name:'Current density / √rpm', unit:`${tu} rpm⁻¹ᐟ²`};
+  if (n === 'jlim') return {name:'j / |j_lim|', unit:''};
+  return {name:'Current density', unit:tu};
+}
+function axisY(){ const l = yLabel(); return l.unit ? `${l.name} (${l.unit})` : l.name; }
+function unitDesc(){ const l = yLabel(); return l.unit ? l.unit : 'j / |j_lim|'; }
+
+function reason(e){
+  if (!isRHE(e.xu)) return 'ref';
+  if (!isAreal(e.yu) && !(normMode() === 'jlim' && isJlim(e.yu))) return 'unit';
+  if (e.id.slice(0,2) === 'CV' && maxE.has(e.id)){
+    const em = parseFloat($('emax').value);
+    if (!isNaN(em) && maxE.get(e.id) > em + 1e-9) return 'emax';
+  }
+  if (e.id.slice(0,2) === 'CV' && maxJ.has(e.id)){
+    const m = maxJ.get(e.id), lo = parseFloat($('jmin').value), hi = parseFloat($('jmax').value);
+    if (!isNaN(lo) && m < lo) return 'low';
+    if (!isNaN(hi) && m > hi) return 'high';
+  }
+  return null;
+}
+function flagged(e){ return reason(e) !== null; }
+function REASON_TEXT(rs, e){
+  if (rs === 'ref') return `potential vs ${e.xu.replace(/^V vs /,'')}, not RHE`;
+  if (rs === 'unit') return `current in ${e.yu}, not per cm²`;
+  if (rs === 'emax') return `max potential = ${maxE.get(e.id).toFixed(2)} V vs RHE, above ${$('emax').value}`;
+  const m = Math.round(maxJ.get(e.id)).toLocaleString();
+  return rs === 'low' ? `max current density = ${m} µA/cm², below ${$('jmin').value}` : `max current density = ${m} µA/cm², above ${$('jmax').value}`;
+}
+
+function factor(yu){
+  const u = (yu||'').trim().toLowerCase();
+  const isMilli = u.startsWith('ma/cm'), isMicro = u.startsWith('ua/cm') || u.startsWith('µa/cm');
+  const toMicro = baseUnit() === 'uA';
+  if (isMilli) return toMicro ? 1000 : 1;
+  if (isMicro) return toMicro ? 1 : 0.001;
+  return 1;
+}
+
+// Fixed margins so every plot has the same x position/width; plot area is taller than wide
+const ASPECT = 1.15, MAXW = 560;
+let xRange = null;
+function dims(div){
+  const W = div.clientWidth || 800, narrow = W < 820;
+  const avail = ($('plots').clientHeight || 800) - 40 - 10 - 55 - 12; // minus title row, margins
+  const pw = narrow ? W - 70 - 16 : Math.max(240, Math.min(W - 70 - 200, MAXW, avail / ASPECT));
+  const m = {l:70, r: narrow ? 16 : W - 70 - pw, t:10, b:55};
+  // Narrow: legend sits under the plot in a fixed-height, scrollable box sized to its rows
+  const legendH = 0; // narrow view uses an HTML legend under the plot instead
+  const ph = Math.round(pw * ASPECT);
+  return {m, height: ph + m.t + m.b + legendH, narrow, legendH, ph};
+}
+function layout(xTitle, yTitle, div){
+  const text = css('--text'), grid = css('--grid'), d = dims(div);
+  return {
+    paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
+    font:{color:text, family:'system-ui, sans-serif', size:13},
+    height: d.height, margin:{...d.m, b: d.m.b + d.legendH, autoexpand:false},
+    xaxis:{title:{text:xTitle}, gridcolor:grid, zerolinecolor:grid, range: xRange ? [...xRange] : undefined, autorange: !xRange, dtick: 0.2, tick0: 0, fixedrange:true},
+    yaxis:{title:{text:yTitle}, gridcolor:grid, zerolinecolor:grid, fixedrange:true},
+    dragmode:false, showlegend: !d.narrow,
+    legend: d.narrow ? {} : {x:1.02, xanchor:'left', y:1, itemsizing:'constant', font:{size:12}},
+    hovermode:'closest'
+  };
+}
+const CFG = {responsive:false, displaylogo:false, scrollZoom:false, doubleClick:false, modeBarButtons:[['toImage']]};
+
+// ---- Dataset info window ----
+let infoId = null;
+function fmt(v, unit=''){ return (v === undefined || v === null || v === '' || v === 'nan') ? '—' : `${v}${unit ? ' ' + unit : ''}`; }
+function openInfo(id){
+  const e = entries().find(x => x.id === id); if (!e) return;
+  infoId = id;
+  const r = e.r, isCV = type === 'cv';
+  const pre = isCV ? 'cv' : 'pol';
+  $('dColor').style.background = colorOf[type].get(id) || 'transparent';
+  $('dTitle').textContent = isCV ? `${e.label} (dataset ${r.dataset_number})` : `${e.label} polarization curve`;
+  const doi = r.doi ? `<a href="https://doi.org/${esc(r.doi)}" target="_blank" rel="noopener">${esc(r.doi)}</a>` : '—';
+  const rs = reason(e), status = rs ? `Excluded: ${REASON_TEXT(rs, e)}` : manualOut[type].has(id) ? 'Removed by you (valid dataset)' : linkedOut(e) ? `Removed because ${LINK_TEXT()}` : 'On main plot';
+  const rows = [
+    ['Authors', esc(r.authors || '—')],
+    ['Year', fmt(r.year)], ['Journal', esc(fmt(r.journal))], ['DOI', doi],
+    isCV ? ['ds_keys', esc(meta.filter(m => m.dataset_number === r.dataset_number).map(m => m.ds_key).join(', '))] : ['ds_key', esc(r.ds_key)],
+    ['Scan rate', fmt(num(e.scan), 'mV/s')],
+    ...(isCV ? [] : [['Rotation rate', fmt(num(e.rpm), 'rpm')]]),
+    ['Units (as extracted)', esc(`${e.xu}; ${e.yu}`)],
+    ...(maxE.has(id) ? [['Max potential', `${maxE.get(id).toFixed(3)} V vs RHE`]] : []),
+    ...(maxJ.has(id) ? [['Max current density', `${maxJ.get(id).toFixed(1)} µA/cm²`]] : []),
+    ['Data points', fmt(r[pre + '_n_points'])],
+    ['Digitization uncertainty', `± ${fmt(r[pre + '_x_uncertainty'])} (x), ± ${fmt(r[pre + '_y_uncertainty'])} (y)`],
+    ['Status', esc(status)],
+    ...(r.notes ? [['Notes', esc(r.notes)]] : [])
+  ];
+  $('dBody').innerHTML = `<p class="ttl">${esc(r.title || '')}</p><p class="sub">${esc(firstAuthor(r.authors))} et al., ${esc(r.year || '')}</p>
+    <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
+  const path = fileFor(r, type);
+  $('dFile').href = (window.EMBEDDED ? REMOTE : BASE) + encodeURI(path);
+  $('dFile').setAttribute('download', path.split('/').pop());
+  const valid = !reason(e);
+  $('dExclude').style.display = valid && selected[type].has(id) ? '' : 'none';
+  $('dExclude').textContent = manualOut[type].has(id) ? 'Return to main plot' : 'Remove from main plot';
+  $('dExclude').classList.toggle('danger', !manualOut[type].has(id));
+  const al = alphaOf[type].has(id) ? alphaOf[type].get(id) : 1;
+  $('dAlpha').value = al; $('dAlphaV').textContent = Math.round(al*100) + '%';
+  $('dAlpha').parentElement.style.display = selected[type].has(id) ? '' : 'none';
+  $('info').showModal();
+}
+$('dClose').addEventListener('click', () => $('info').close());
+$('info').addEventListener('click', ev => { if (ev.target === $('info')) $('info').close(); });
+$('dAlpha').addEventListener('input', () => {
+  const v = parseFloat($('dAlpha').value); alphaOf[type].set(infoId, v); $('dAlphaV').textContent = Math.round(v*100) + '%'; draw();
+});
+$('dExclude').addEventListener('click', () => {
+  manualOut[type].has(infoId) ? manualOut[type].delete(infoId) : manualOut[type].add(infoId);
+  $('info').close(); renderList(); draw();
+});
+function bindClicks(div){
+  if (div._bound) return; div._bound = true;
+  div.on('plotly_click', d => { const id = d.points && d.points[0] && d.points[0].data.meta; if (id) openInfo(id); });
+}
+
+const alphaOf = {cv: new Map(), pol: new Map()};
+const plotAlpha = {};
+// ---- Linking CVs and pol curves by dataset number ----
+// A dataset is "on main" for its own tab if it passes the filters, is ticked,
+// meets the criteria and wasn't removed by hand.
+function onMainOwn(t, e, passing){ return passing.has(e.id) && !unticked[t].has(e.id) && !reason(e) && !manualOut[t].has(e.id); }
+function killedNumbers(t){
+  // dataset numbers removed in tab t because the other tab removed them
+  const o = t === 'cv' ? 'pol' : 'cv', passing = new Set(filtered(o).map(e => e.id)), byN = new Map();
+  for (const e of entries(o)){ const n = e.r.dataset_number; if (!byN.has(n)) byN.set(n, false); if (onMainOwn(o, e, passing)) byN.set(n, true); }
+  return new Set([...byN].filter(([n, ok]) => !ok).map(([n]) => n));
+}
+let killedCache = null;
+function linkedOut(e){
+  if (!$('linked').checked) return false;
+  if (!killedCache || killedCache.t !== type) killedCache = {t: type, set: killedNumbers(type)};
+  return killedCache.set.has(e.r.dataset_number);
+}
+function LINK_TEXT(){ return type === 'cv' ? 'its pol curve(s) were removed' : 'its CV was removed'; }
+
+const GROUPS = ['main','manual','linked','ref','unit','nonorm','emax','low','high'];
+const CRITERIA = ['ref','unit','nonorm','emax','low','high'];
+const manualOut = {cv: new Set(), pol: new Set()};
+function groupInfo(g){
+  const kind = type === 'cv' ? 'CVs' : 'Polarization curves', tu = targetUnit();
+  return {
+    main: {title:`<b>${kind}</b> · V vs RHE, ${unitDesc()}`, x:'Potential (V vs RHE)', y:axisY()},
+    linked: {title:`<b>Removed because ${LINK_TEXT()}</b> · V vs RHE, ${unitDesc()}`, x:'Potential (V vs RHE)', y:axisY()},
+    nonorm: {title:`<b>Excluded: can't be normalized</b> · ${normMode() === 'sqrt' ? 'no rotation rate reported' : `no data between ${$('jlA').value} and ${$('jlB').value} V`}`, x:'Potential (V vs RHE)', y:`Current density (${tu})`},
+    manual: {title:`<b>Removed from main plot</b> · V vs RHE, ${unitDesc()}`, x:'Potential (V vs RHE)', y:axisY()},
+    ref:  {title:`<b>Excluded: potential not vs RHE</b> · original units`, x:'Potential (original reference)', y:'Current / current density (original units)'},
+    unit: {title:`<b>Excluded: current not per cm²</b> · original units`, x:'Potential (V vs RHE)', y:'Current / current density (original units)'},
+    emax: {title:`<b>Excluded: max potential above ${$('emax').value} V vs RHE</b>`, x:'Potential (V vs RHE)', y:axisY()},
+    low:  {title:`<b>Excluded: max current density below ${$('jmin').value} µA/cm²</b>`, x:'Potential (V vs RHE)', y:axisY()},
+    high: {title:`<b>Excluded: max current density above ${$('jmax').value} µA/cm²</b>`, x:'Potential (V vs RHE)', y:axisY()},
+  }[g];
+}
+function ensureWrap(g){
+  let w = document.getElementById('w_' + g);
+  if (w) return w;
+  w = document.createElement('div'); w.className = 'pwrap'; w.id = 'w_' + g; w.hidden = true;
+  w.innerHTML = `<div class="ptitle"><span class="pt"></span><label>Opacity <input type="range" min="0.05" max="1" step="0.05" value="1"></label><button class="btn csvBtn">Download CSV</button></div><div class="pl" id="p_${g}"></div><div class="hlegend" hidden></div>`;
+  w.querySelector('input').addEventListener('input', ev => {
+    plotAlpha[g] = parseFloat(ev.target.value);
+    const div = document.getElementById('p_' + g);
+    if (div.data) Plotly.restyle(div, {'marker.opacity': div.data.map(t => plotAlpha[g] * (alphaOf[type].get(t.meta) ?? 1))});
+  });
+  (secOf(g) ? $('box_' + secOf(g)) : $('topBox')).appendChild(w);
+  w.querySelector('.csvBtn').addEventListener('click', () => downloadCSV(g));
+  return w;
+}
+
+// ---- CSV export of the curves currently visible on a plot ----
+function csvCell(v){ v = v === undefined || v === null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+function downloadCSV(g){
+  const div = document.getElementById('p_' + g);
+  const traces = (div.data || []).filter(t => t.visible !== 'legendonly' && t.visible !== false);
+  if (!traces.length){ alertStatus('Nothing visible on that plot to export.'); return; }
+  const byId = Object.fromEntries(entries().map(e => [e.id, e]));
+  const conv = !(g === 'ref' || g === 'unit');
+  const head = [], cols = [];
+  for (const t of traces){
+    const e = byId[t.meta];
+    const xu = conv ? 'V vs RHE' : e.xu;
+    const nl = (conv && g !== 'nonorm') ? yLabel() : {name: (conv || isAreal(e.yu)) ? 'Current density' : 'Current', unit: conv ? targetUnit() : e.yu};
+    head.push(`${t.meta} Potential (${xu})`, `${t.meta} ${nl.name}` + (nl.unit ? ` (${nl.unit})` : ''));
+    cols.push(t._fx || t.x, t._fy || t.y);
+  }
+  const n = Math.max(...cols.map(c => c.length));
+  const src = traces.map(t => { const e = byId[t.meta]; return [`${t.meta}: ${e.r.authors || ''} (${e.r.year || ''}) doi:${e.r.doi || ''}`, '']; }).flat();
+  const lines = [src.map(csvCell).join(','), head.map(csvCell).join(',')];
+  for (let i = 0; i < n; i++) lines.push(cols.map(c => i < c.length ? Number(c[i].toPrecision(6)) : '').join(','));
+  const blob = new Blob(['﻿' + lines.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pt111_${type}_${g}_${traces.length}datasets.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function alertStatus(msg){ $('status').textContent = msg; }
+
+// ---- Recover from lost WebGL contexts (the "sad face" plot) ----
+const GL_MIN = 25, SVG_MAXPTS = 1500;
+let glRetries = 0;
+function watchGL(div){
+  div.querySelectorAll('canvas').forEach(c => {
+    if (c._watched) return; c._watched = true;
+    c.addEventListener('webglcontextlost', ev => {
+      ev.preventDefault();
+      if (glRetries++ > 5) return;
+      setTimeout(() => { Plotly.purge(div); div._bound = false; div._gl = null; draw(); }, 250);
+    });
+  });
+}
+
+const SECTIONS = {
+  rem:  {groups:['manual','linked'], open:false, title:'Removed from main plot'},
+  crit: {groups:CRITERIA, open:false, title:'Filtered out by exclusion criteria'},
+};
+function secOf(g){ return Object.keys(SECTIONS).find(k => SECTIONS[k].groups.includes(g)); }
+function shown(g){ const k = secOf(g); return !k || SECTIONS[k].open; }
+let drawToken = 0;
+async function draw(){
+  const token = ++drawToken;
+  killedCache = null;
+  const ids = [...selected[type]];
+  const all = entries(), byId = Object.fromEntries(all.map(e => [e.id, e]));
+  $('status').textContent = ids.length ? `Loading ${ids.length} file(s)…` : 'Select datasets on the left to plot them.';
+  const groups = Object.fromEntries(GROUPS.map(g => [g, []])), failed = [];
+  await Promise.all(ids.map(async (id, i) => {
+    const e = byId[id]; if (!e) return;
+    try{
+      const d = await load(fileFor(e.r, type));
+      let g = reason(e) || (manualOut[type].has(id) ? 'manual' : linkedOut(e) ? 'linked' : 'main');
+      const conv = convertible(e), f = conv ? factor(e.yu) : 1;
+      let y = f === 1 ? d.y : d.y.map(v => v*f), normed = false;
+      const nm = normMode();
+      if (nm && !(g === 'ref' || g === 'unit')){
+        if (nm === 'sqrt'){
+          const rpm = num(e.rpm);
+          if (rpm > 0){ const k = Math.sqrt(rpm); y = y.map(v => v / k); normed = true; } else g = 'nonorm';
+        } else if (isJlim(e.yu)){ normed = true; }
+        else {
+          const a = Math.min(+$('jlA').value, +$('jlB').value), b = Math.max(+$('jlA').value, +$('jlB').value);
+          let sum = 0, n = 0; d.x.forEach((x, k) => { if (x >= a && x <= b){ sum += y[k]; n++; } });
+          const jl = n ? Math.abs(sum / n) : 0;
+          if (jl > 0){ y = y.map(v => v / jl); normed = true; e._jlim = sum / n; } else g = 'nonorm';
+        }
+      }
+      const yl = normed ? yLabel() : {name:'', unit: conv ? targetUnit() : e.yu};
+      groups[g][i] = {
+        meta: id,
+        x: d.x, y, type:'scattergl', mode:'markers',
+        marker:{size:2.5, color:colorOf[type].get(id), opacity:(plotAlpha[g] ?? 1) * (alphaOf[type].get(id) ?? 1)},
+        name: `${e.label} · ${firstAuthor(e.r.authors)} ${e.r.year||''}` + (g === 'ref' || g === 'unit' ? ` (${e.xu}; ${e.yu})` : ''),
+        hovertemplate: `<b>${e.label}</b><br>%{x:.3f} ${e.xu}<br>%{y:.3g} ${yl.unit}<extra></extra>`
+      };
+    }catch(err){ failed.push(e.label); }
+  }));
+  if (token !== drawToken) return;
+  // Shared potential range across all plots
+  let lo = Infinity, hi = -Infinity;
+  for (const g of GROUPS) if (shown(g)) for (const t of groups[g]) if (t) for (const v of t.x){ if (v < lo) lo = v; if (v > hi) hi = v; }
+  xRange = isFinite(lo) ? [lo - 0.03*(hi-lo), hi + 0.03*(hi-lo)] : (type === 'cv' ? [0, 1] : [0.2, 1.1]);
+  let total = 0; const counts = {};
+  for (const k in SECTIONS) $('box_' + k).hidden = !SECTIONS[k].open;
+  GROUPS.forEach(ensureWrap);
+  for (const g of GROUPS){
+    const tr = groups[g].filter(Boolean), w = ensureWrap(g), div = document.getElementById('p_' + g);
+    // WebGL only for the busy main plot; the rest use SVG (browsers allow few WebGL contexts)
+    const useGL = g === 'main' && tr.length > GL_MIN;
+    for (const t of tr){
+      t._fx = t.x; t._fy = t.y;
+      if (useGL){ t.type = 'scattergl'; continue; }
+      t.type = 'scatter';
+      const step = Math.ceil(t.x.length / SVG_MAXPTS);
+      if (step > 1){ t.x = t.x.filter((_, k) => k % step === 0); t.y = t.y.filter((_, k) => k % step === 0); }
+    }
+    total += tr.length;
+    w.hidden = !(g === 'main' || g === 'manual') && tr.length === 0;
+    counts[g] = tr.length;
+    if (!shown(g)) w.hidden = true;   // collapsed section: don't render
+    if (w.hidden){ if (div.data) { Plotly.purge(div); div._bound = false; } continue; }
+    const gi = groupInfo(g);
+    w.querySelector('.pt').innerHTML = `${gi.title} (${tr.length})`;
+    w.querySelector('input').value = plotAlpha[g] ?? 1;
+    div._n = tr.length; div._gi = gi;
+    if (g === 'ref' || g === 'unit'){
+      const allAreal = tr.every(t => isAreal(byId[t.meta].yu)), noneAreal = tr.every(t => !isAreal(byId[t.meta].yu));
+      gi.y = (allAreal ? 'Current density' : noneAreal ? 'Current' : 'Current / current density') + ' (original units)';
+    }
+    const lay = layout(gi.x, gi.y, div);
+    if (!tr.length){
+      lay.yaxis.range = normMode() === 'jlim' ? [-1.2, 0.1] : (type === 'cv' ? [-150, 150] : [-7000, 500]).map(v => (baseUnit() === 'uA' ? v : v / 1000) / (normMode() === 'sqrt' ? 40 : 1));
+      if (g === 'manual') lay.annotations = [{text:'Click a curve on the main plot and choose<br>“Remove from main plot” to move it here.', xref:'paper', yref:'paper', x:0.5, y:0.5, showarrow:false, font:{color:css('--muted'), size:13}}];
+    }
+    if (div._gl !== useGL && div.data){ Plotly.purge(div); div._bound = false; }
+    div._gl = useGL;
+    await Plotly.react(div, tr, lay, {...CFG, toImageButtonOptions:{format:'png', filename:`pt111_${type}_${g}`, scale:3}});
+    if (token !== drawToken) return;
+    const hl = w.querySelector('.hlegend');
+    hl.hidden = !(dims(div).narrow && tr.length);
+    if (!hl.hidden) hl.innerHTML = tr.map(t => `<span data-info="${esc(t.meta)}" title="${esc(t.name)}"><i style="background:${t.marker.color}"></i>${esc(t.name)}</span>`).join('');
+    bindClicks(div);
+    if (useGL) watchGL(div);
+  }
+  const SHORT = {manual:'by you', linked:'linked', ref:'not vs RHE', unit:'not per cm²', nonorm:'can\'t normalize', emax:'high potential', low:'low current', high:'high current'};
+  for (const [k, sec] of Object.entries(SECTIONS)){
+    const n = sec.groups.reduce((a, g) => a + (counts[g] || 0), 0);
+    const parts = sec.groups.filter(g => counts[g]).map(g => `${SHORT[g]}: ${counts[g]}`);
+    $('div_' + k).hidden = k === 'crit' && n === 0;
+    $('div_' + k).querySelector('.divLbl').innerHTML = `${sec.open ? '▾' : '▸'} ${sec.title} (${n}) <span class="divsub">` +
+      (parts.length > 1 ? '· ' + parts.join(', ') + ' ' : '') + `· click to ${sec.open ? 'hide' : 'show'}</span>`;
+    $('div_' + k).setAttribute('aria-expanded', sec.open);
+  }
+  setTimeout(() => { glRetries = 0; }, 5000);
+  $('status').textContent = ids.length
+    ? `${total} plotted` + (failed.length ? ` · couldn't load: ${failed.join(', ')}` : '')
+    : 'Select datasets on the left to plot them.';
+}
+
+// Events
+['jlA','jlB'].forEach(id => $(id).addEventListener('input', () => { syncNorm(); renderList(); draw(); }));
+for (const k in SECTIONS) $('div_' + k).addEventListener('click', () => { SECTIONS[k].open = !SECTIONS[k].open; draw(); });
+$('plots').addEventListener('click', ev => { const sp = ev.target.closest('.hlegend span'); if (sp) openInfo(sp.dataset.info); });
+$('linked').addEventListener('change', () => { renderList(); draw(); });
+$('unitSeg').addEventListener('click', ev => {
+  const u = ev.target.dataset.u; if (!u || u === dispMode[type]) return;
+  dispMode[type] = u; syncUnitSeg(); syncNorm(); renderList(); draw();
+});
+$('typeSeg').addEventListener('click', ev => {
+  const t = ev.target.dataset.t; if (!t || t === type) return;
+  type = t;
+  document.querySelectorAll('#typeSeg button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  refreshFilters(); syncUnitSeg(); syncNorm(); renderList(); draw();
+});
+$('list').addEventListener('click', ev => { const id = ev.target.dataset && ev.target.dataset.info; if (id){ ev.preventDefault(); openInfo(id); } });
+$('list').addEventListener('change', ev => {
+  const id = ev.target.dataset.id; if (!id) return;
+  ev.target.checked ? unticked[type].delete(id) : unticked[type].add(id);
+  renderList(); draw();
+});
+$('emax').addEventListener('input', () => { renderList(); draw(); });
+$('jmin').addEventListener('input', () => { renderList(); draw(); });
+$('jmax').addEventListener('input', () => { renderList(); draw(); });
+['search','hideOdd','withPol',...Object.keys(FILTERS)].forEach(id => $(id).addEventListener('input', () => { renderList(); draw(); }));
+$('resetF').addEventListener('click', () => { Object.keys(FILTERS).forEach(id => $(id).value = ''); $('search').value=''; $('hideOdd').checked=false; $('withPol').checked=false; unticked[type].clear(); renderList(); draw(); });
+$('chipList') && $('chipList').addEventListener('click', ev => { if (ev.target.dataset.info) return openInfo(ev.target.dataset.info); const id = ev.target.dataset.rm; if (!id) return; unticked[type].add(id); renderList(); draw(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(draw, 200); });
+
+// Init
+getText('metadata.csv').then(t => t.startsWith('ds_key') || t.startsWith('\uFEFFds_key') ? t : Promise.reject())
+  .catch(() => { BASE = REMOTE; return getText('metadata.csv'); })
+  .then(txt => {
+  meta = Papa.parse(txt.replace(/^﻿/, ''), {header:true, skipEmptyLines:true}).data
+    .map(r => ({...r, dataset_number: parseInt(r.dataset_number), prep: parseInt(r.prep)}));
+  // Fill blank publication fields from other rows of the same dataset
+  for (const k of ['authors','year','title','journal','doi','url']){
+    const best = {};
+    meta.forEach(r => { if (r[k] && !best[r.dataset_number]) best[r.dataset_number] = r[k]; });
+    meta.forEach(r => { if (!r[k]) r[k] = best[r.dataset_number] || ''; });
+  }
+  meta.forEach(r => { if (r.pol_n_points) hasPol.add(r.dataset_number); });
+  syncUnitSeg(); syncNorm();
+  refreshFilters(); renderList(); draw();
+  computeMaxJ().then(() => { renderList(); draw(); });
+}).catch(() => {
+  $('status').textContent = 'Could not load metadata.csv locally or from GitHub. Check that the repo is public.';
+});
+</script>
+</body>
+</html>
