@@ -329,16 +329,31 @@ function renderList(){
   }).join('');
 }
 
+// Compact copy of all curves (viewer_data.json, built by make_viewer_data.py)
+let BUNDLE = null;
+async function loadBundle(){
+  try{
+    const txt = await getText('viewer_data.json');
+    BUNDLE = JSON.parse(txt).files;
+  }catch(err){ BUNDLE = null; }   // fall back to reading the CSVs one by one
+}
 async function load(path){
-  if (cache.has(path)) return cache.get(path);
-  const p = getText(path)
+  if (BUNDLE && BUNDLE[path]) return BUNDLE[path];
+  return loadFull(path);
+}
+// Full-resolution CSV (used for exports, or when there is no bundle)
+const fullCache = new Map();
+async function loadFull(path){
+  if (fullCache.has(path)) return fullCache.get(path);
+  const p = getText(path).catch(() => fetch(REMOTE + encodeURI(path)).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }))
     .then(txt => {
       const rows = Papa.parse(txt.replace(/^﻿/, ''), {skipEmptyLines:true}).data;
       const x = [], y = [];
       for (const row of rows.slice(1)){ const a = num(row[0]), b = num(row[1]); if (a!==null && b!==null){ x.push(a); y.push(b); } }
       return {x, y};
     });
-  cache.set(path, p);
+  fullCache.set(path, p);
+  p.catch(() => fullCache.delete(path));
   return p;
 }
 
@@ -359,9 +374,10 @@ async function computeMaxJ(){
     try{
       const d = await load(fileFor(e.r, 'cv'));
       const f = /^ma\/cm/i.test((e.yu||'').trim()) ? 1000 : 1;
-      let m = -Infinity; for (const v of d.y) if (v > m) m = v;
+      let m = d.ymax, mx = d.xmax;
+      if (m === undefined){ m = -Infinity; for (const v of d.y) if (v > m) m = v; }
+      if (mx === undefined){ mx = -Infinity; for (const v of d.x) if (v > mx) mx = v; }
       maxJ.set(e.id, m * f);
-      let mx = -Infinity; for (const v of d.x) if (v > mx) mx = v;
       maxE.set(e.id, mx);
     }catch(err){}
   }));
@@ -549,10 +565,11 @@ function ensureWrap(g){
 
 // ---- CSV export of the curves currently visible on a plot ----
 function csvCell(v){ v = v === undefined || v === null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
-function downloadCSV(g){
+async function downloadCSV(g){
   const div = document.getElementById('p_' + g);
   const traces = (div.data || []).filter(t => t.visible !== 'legendonly' && t.visible !== false);
   if (!traces.length){ alertStatus('Nothing visible on that plot to export.'); return; }
+  alertStatus(`Preparing full-resolution CSV for ${traces.length} dataset(s)…`);
   const byId = Object.fromEntries(entries().map(e => [e.id, e]));
   const conv = !(g === 'ref' || g === 'unit');
   const head = [], cols = [];
@@ -561,7 +578,9 @@ function downloadCSV(g){
     const xu = conv ? 'V vs RHE' : e.xu;
     const nl = (conv && g !== 'nonorm') ? yLabel() : {name: (conv || isAreal(e.yu)) ? 'Current density' : 'Current', unit: conv ? targetUnit() : e.yu};
     head.push(`${t.meta} Potential (${xu})`, `${t.meta} ${nl.name}` + (nl.unit ? ` (${nl.unit})` : ''));
-    cols.push(t._fx || t.x, t._fy || t.y);
+    let x = t._fx || t.x, y = t._fy || t.y;
+    try{ const full = await loadFull(t._path); x = full.x; y = full.y.map(v => v * t._scale); }catch(err){}
+    cols.push(x, y);
   }
   const n = Math.max(...cols.map(c => c.length));
   const src = traces.map(t => { const e = byId[t.meta]; return [`${t.meta}: ${e.r.authors || ''} (${e.r.year || ''}) doi:${e.r.doi || ''}`, '']; }).flat();
@@ -573,6 +592,7 @@ function downloadCSV(g){
   a.download = `pt111_${type}_${g}_${traces.length}datasets.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  alertStatus(`Downloaded ${traces.length} dataset(s).`);
 }
 function alertStatus(msg){ $('status').textContent = msg; }
 
@@ -610,23 +630,23 @@ async function draw(){
       const d = await load(fileFor(e.r, type));
       let g = reason(e) || (manualOut[type].has(id) ? 'manual' : linkedOut(e) ? 'linked' : 'main');
       const conv = convertible(e), f = conv ? factor(e.yu) : 1;
-      let y = f === 1 ? d.y : d.y.map(v => v*f), normed = false;
+      let y = f === 1 ? d.y : d.y.map(v => v*f), normed = false, scale = f;
       const nm = normMode();
       if (nm && !(g === 'ref' || g === 'unit')){
         if (nm === 'sqrt'){
           const rpm = num(e.rpm);
-          if (rpm > 0){ const k = Math.sqrt(rpm); y = y.map(v => v / k); normed = true; } else g = 'nonorm';
+          if (rpm > 0){ const k = Math.sqrt(rpm); y = y.map(v => v / k); normed = true; scale /= k; } else g = 'nonorm';
         } else if (isJlim(e.yu)){ normed = true; }
         else {
           const a = Math.min(+$('jlA').value, +$('jlB').value), b = Math.max(+$('jlA').value, +$('jlB').value);
           let sum = 0, n = 0; d.x.forEach((x, k) => { if (x >= a && x <= b){ sum += y[k]; n++; } });
           const jl = n ? Math.abs(sum / n) : 0;
-          if (jl > 0){ y = y.map(v => v / jl); normed = true; e._jlim = sum / n; } else g = 'nonorm';
+          if (jl > 0){ y = y.map(v => v / jl); normed = true; scale /= jl; e._jlim = sum / n; } else g = 'nonorm';
         }
       }
       const yl = normed ? yLabel() : {name:'', unit: conv ? targetUnit() : e.yu};
       groups[g][i] = {
-        meta: id,
+        meta: id, _path: fileFor(e.r, type), _scale: scale,
         x: d.x, y, type:'scattergl', mode:'markers',
         marker:{size:2.5, color:colorOf[type].get(id), opacity:(plotAlpha[g] ?? 1) * (alphaOf[type].get(id) ?? 1)},
         name: `${e.label} · ${firstAuthor(e.r.authors)} ${e.r.year||''}` + (g === 'ref' || g === 'unit' ? ` (${e.xu}; ${e.yu})` : ''),
@@ -729,7 +749,7 @@ let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setT
 // Init
 getText('metadata.csv').then(t => t.startsWith('ds_key') || t.startsWith('\uFEFFds_key') ? t : Promise.reject())
   .catch(() => { BASE = REMOTE; return getText('metadata.csv'); })
-  .then(txt => {
+  .then(async txt => {
   meta = Papa.parse(txt.replace(/^﻿/, ''), {header:true, skipEmptyLines:true}).data
     .map(r => ({...r, dataset_number: parseInt(r.dataset_number), prep: parseInt(r.prep)}));
   // Fill blank publication fields from other rows of the same dataset
@@ -740,8 +760,11 @@ getText('metadata.csv').then(t => t.startsWith('ds_key') || t.startsWith('\uFEFF
   }
   meta.forEach(r => { if (r.pol_n_points) hasPol.add(r.dataset_number); });
   syncUnitSeg(); syncNorm();
+  $('status').textContent = 'Loading curves…';
+  await loadBundle();
+  if (BUNDLE) await computeMaxJ();          // instant: maxima are stored in the bundle
   refreshFilters(); renderList(); draw();
-  computeMaxJ().then(() => { renderList(); draw(); });
+  if (!BUNDLE) computeMaxJ().then(() => { renderList(); draw(); });
 }).catch(() => {
   $('status').textContent = 'Could not load metadata.csv locally or from GitHub. Check that the repo is public.';
 });
