@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pt(111) Data Viewer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.2/plotly.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script>/* backup CDN if the first one fails */
+window.Papa || document.write('<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"><\/script>');
+window.Plotly || document.write('<script src="https://unpkg.com/plotly.js-dist-min@2.35.2/plotly.min.js"><\/script>');
+</script>
 <style>
 :root{
   --bg:#f7f7f5;--panel:#ffffff;--text:#1d1d1b;--muted:#6b6b66;--border:#deded9;
