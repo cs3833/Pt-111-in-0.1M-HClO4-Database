@@ -28,8 +28,9 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-ap
 header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
 header h1{font-size:17px;margin:0;font-weight:600}
 header span{color:var(--muted);font-size:13px}
-main{display:grid;grid-template-columns:340px 1fr;height:calc(100vh - 52px)}
-aside{border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+main{display:grid;grid-template-columns:340px 1fr;flex:1;min-height:0}
+aside{border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0;overflow-y:auto}
 .controls{padding:12px 16px;border-bottom:1px solid var(--border);display:grid;gap:10px}
 .seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
 .seg button{flex:1;border:0;background:transparent;color:var(--text);padding:7px;cursor:pointer;font:inherit}
@@ -41,7 +42,7 @@ input[type=search]{width:100%}
 .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:5px;padding:4px 9px;cursor:pointer}
 .btn:hover{border-color:var(--accent)}
 .check{display:flex;gap:6px;align-items:center;font-size:13px}
-#list{overflow:auto;flex:1;padding:4px 0}
+#list{padding:4px 0}
 .item{display:grid;grid-template-columns:18px 1fr;gap:8px;padding:6px 16px;cursor:pointer;border-left:3px solid transparent}
 .item:hover{background:var(--accent-soft)}
 .item input{margin-top:3px}
@@ -90,10 +91,21 @@ dialog#info::backdrop{background:rgba(0,0,0,.3)}
 .chip .lbl:hover{text-decoration:underline}
 .linkRow{font-weight:600}
 .jlRow{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.mbox{border:1px solid var(--border);border-radius:8px;padding:6px 10px 10px;display:grid;gap:8px}
+.mbox summary{cursor:pointer;font-weight:600;font-size:13px;padding:2px 0}
+.mbox[open] summary{margin-bottom:2px}
+.msub{font-size:12px;font-weight:600;color:var(--text);margin-top:4px}
+.msub .hint{font-weight:400;color:var(--muted)}
+.mrow{display:grid;grid-template-columns:1fr 64px 64px;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.mrow .ml{color:var(--text)}
+.mrow .ml small{display:block;color:var(--muted)}
+.mrow input{width:100%}
+.mset{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.mset input{width:58px}
 #count{font-size:12px;color:var(--muted)}
 section{display:flex;flex-direction:column;min-width:0;min-height:0}
 #plots{flex:1;display:block;min-height:0;overflow:auto}
-.pwrap{display:block}
+.pwrap{display:block;max-width:1200px}
 .pwrap[hidden]{display:none}
 .pwrap + .pwrap{border-top:1px solid var(--border)}
 .ptitle{padding:8px 16px 0;font-size:12px;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
@@ -115,9 +127,10 @@ section{display:flex;flex-direction:column;min-width:0;min-height:0}
 .divsub{font-weight:400;text-transform:none;letter-spacing:0}
 #status{padding:6px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
 @media (max-width:800px){
+  body{display:block;height:auto;overflow:visible}
   main{grid-template-columns:1fr;height:auto}
-  aside{border-right:0;border-bottom:1px solid var(--border);max-height:none}
-  #list{max-height:45vh}
+  aside{border-right:0;border-bottom:1px solid var(--border);max-height:none;overflow:visible}
+  #list{max-height:45vh;overflow:auto}
   section{min-height:100vh}
   #plots{overflow:visible}
 }
@@ -144,18 +157,29 @@ section{display:flex;flex-direction:column;min-width:0;min-height:0}
       <div class="span2 unitRow"><span>Plot current in</span>
         <div class="seg small" id="unitSeg"><button data-u="uA">µA/cm²</button><button data-u="mA">mA/cm²</button><button data-u="sqrt" class="polOnly" title="mA/cm² ÷ √rpm">÷ √rpm</button><button data-u="jlim" class="polOnly" title="j ÷ |j_lim|">j/|j_lim|</button></div>
       </div>
-      <div class="span2 jlRow" id="jlRow">j_lim = average from <input type="number" id="jlA" value="0.4" step="0.05"> to <input type="number" id="jlB" value="0.6" step="0.05"> V vs RHE</div>
       <label>Scan rate<select id="f_scan"></select></label>
       <label class="polOnly">rpm<select id="f_rpm"></select></label>
     </div>
     <button class="btn" id="resetF">Reset filters</button>
-    <div class="row cvOnly" id="boundsRow">
-      <label for="jmin">Exclude CVs if max current density &lt;</label><input type="number" id="jmin" value="10" step="5">
-      <label for="jmax">or &gt;</label><input type="number" id="jmax" value="200" step="10"><label>µA/cm²</label>
-    </div>
-    <div class="row cvOnly">
-      <label for="emax">Exclude CVs if max potential &gt;</label><input type="number" id="emax" value="1.05" step="0.05"><label>V vs RHE</label>
-    </div>
+    <details class="mbox" open>
+      <summary>Exclusion criteria</summary>
+      <div class="row cvOnly" id="boundsRow">
+        <label for="jmin">Exclude CVs if max current density &lt;</label><input type="number" id="jmin" value="10" step="5">
+        <label for="jmax">or &gt;</label><input type="number" id="jmax" value="200" step="10"><label>µA/cm²</label>
+      </div>
+      <div class="row cvOnly">
+        <label for="emax">Exclude CVs if max potential &gt;</label><input type="number" id="emax" value="1.05" step="0.05"><label>V vs RHE</label>
+      </div>
+      <div class="msub">Metric filters <span class="hint">· leave blank for no limit</span></div>
+      <div id="metricRows"></div>
+      <div class="msub">Metric settings</div>
+      <div class="mset cvOnly">Butterfly peak search <input type="number" id="bfLo" value="0.70" step="0.01"> to <input type="number" id="bfHi" value="0.90" step="0.01"> V</div>
+      <div class="mset cvOnly">Plateau search <input type="number" id="plLo" value="0.05" step="0.01"> to <input type="number" id="plHi" value="0.40" step="0.01"> V</div>
+      <div class="mset cvOnly">Plateau = flattest window of width <input type="number" id="plW" value="0.10" step="0.01"> V</div>
+      <div class="mset polOnly" id="jlRow">j_lim = average from <input type="number" id="jlA" value="0.4" step="0.05"> to <input type="number" id="jlB" value="0.6" step="0.05"> V</div>
+      <div class="mset polOnly">Tafel fit from <input type="number" id="tfLo" value="0.85" step="0.01"> to <input type="number" id="tfHi" value="0.95" step="0.01"> V</div>
+      <button class="btn" id="metricsCSV">Download metrics table (CSV)</button>
+    </details>
     <label class="check cvOnly"><input type="checkbox" id="withPol"> Only datasets with pol curve data</label>
     <label class="check"><input type="checkbox" id="hideOdd"> Hide excluded datasets from the list</label>
     <div class="row">
@@ -319,10 +343,11 @@ function renderChips(){
 
 function renderList(){
   killedCache = null;
+  if (typeof updateRanges === 'function') updateRanges();
   syncSel();
   renderChips();
   const es = filtered(), sel = selected[type];
-  const nf = type === 'cv' ? entries().filter(flagged).length : 0;
+  const nf = entries().filter(flagged).length;
   $('count').textContent = `${es.length} shown · ${sel.size} plotted` + (nf ? ` · ${nf} excluded` : '') + (type==='cv' && !maxReady ? ' · checking currents…' : '');
   $('list').innerHTML = es.map(e => {
     const bits = [e.scan && `${num(e.scan)} mV/s`, e.rpm && `${num(e.rpm)} rpm`, `${e.xu}, ${e.yu}`].filter(Boolean).join(' · ');
@@ -393,7 +418,166 @@ async function computeMaxJ(){
 // Why a dataset is kept off the main plot (null = goes on main plot)
 function normMode(){ return type === 'pol' && (dispMode.pol === 'sqrt' || dispMode.pol === 'jlim') ? dispMode.pol : ''; }
 function isJlim(u){ return /j\s*\/\s*j_?lim/i.test(u || ''); }
-function syncNorm(){ $('jlRow').style.display = (normMode() === 'jlim') ? '' : 'none'; }
+function syncNorm(){}
+
+// ===== Activity / CV metrics =====
+const METRICS = {
+  bfH:   {t:'cv',  label:'Butterfly peak height',     unit:'µA/cm²',   dp:1, short:'butterfly height'},
+  bfE:   {t:'cv',  label:'Butterfly peak potential',  unit:'V vs RHE', dp:3, short:'butterfly potential'},
+  plH:   {t:'cv',  label:'Plateau height',            unit:'µA/cm²',   dp:1, short:'plateau height'},
+  jlim:  {t:'pol', label:'Diffusion-limited current j_lim', unit:'mA/cm²', dp:2, short:'j_lim'},
+  e12:   {t:'pol', label:'Half-wave potential E½',    unit:'V vs RHE', dp:3, short:'E½'},
+  tafel: {t:'pol', label:'Tafel slope',               unit:'mV/dec',   dp:1, short:'Tafel slope'},
+  sa:    {t:'pol', label:'Specific activity @ 0.9 V', unit:'mA/cm²',   dp:3, short:'specific activity'},
+};
+const MKEYS = Object.keys(METRICS);
+const METRIC = new Map();           // dataset id -> {metric: value}
+const val = id => parseFloat($(id).value);
+
+// Average (or max) of y in potential bins, sorted by potential
+function bins(x, y, step, mode, keep){
+  const m = new Map();
+  for (let i = 0; i < x.length; i++){
+    if (keep && !keep(y[i])) continue;
+    const k = Math.round(x[i] / step);
+    const b = m.get(k) || {s:0, n:0, mx:-Infinity};
+    b.s += y[i]; b.n++; if (y[i] > b.mx) b.mx = y[i];
+    m.set(k, b);
+  }
+  const ks = [...m.keys()].sort((a, b) => a - b);
+  return {x: ks.map(k => k * step), y: ks.map(k => mode === 'max' ? m.get(k).mx : m.get(k).s / m.get(k).n)};
+}
+function linfit(x, y){
+  const n = x.length; let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++){ sx += x[i]; sy += y[i]; sxx += x[i]*x[i]; sxy += x[i]*y[i]; }
+  const slope = (n*sxy - sx*sy) / (n*sxx - sx*sx);
+  return {slope, icpt: (sy - slope*sx) / n};
+}
+function interp(bx, by, x0){
+  for (let i = 1; i < bx.length; i++) if (bx[i-1] <= x0 && x0 <= bx[i]) return by[i-1] + (by[i]-by[i-1]) * (x0-bx[i-1]) / (bx[i]-bx[i-1] || 1);
+  return null;
+}
+
+// CV (µA/cm²): butterfly peak = most prominent local maximum of the anodic sweep in the search window
+function cvMetrics(x, y){
+  const out = {};
+  const a = bins(x, y, 0.002, 'max', v => v > 0), lo = val('bfLo'), hi = val('bfHi');
+  let best = null;
+  for (let i = 0; i < a.x.length; i++){
+    if (a.x[i] < lo || a.x[i] > hi) continue;
+    let isMax = true, floor = Infinity;
+    for (let j = 0; j < a.x.length; j++){
+      const d = Math.abs(a.x[j] - a.x[i]);
+      if (d <= 0.015 && a.y[j] > a.y[i]) { isMax = false; break; }
+      if (d <= 0.05 && a.y[j] < floor) floor = a.y[j];
+    }
+    if (!isMax) continue;
+    const prom = a.y[i] - floor;
+    if (!best || prom > best.prom) best = {E: a.x[i], j: a.y[i], prom};
+  }
+  if (best){ out.bfH = best.j; out.bfE = best.E; }
+  // Plateau = mean anodic current in the flattest window (smallest fitted slope) of the search range
+  const p = bins(x, y, 0.005, 'mean', v => v > 0), pl = val('plLo'), ph = val('plHi'), w = val('plW');
+  let flat = null;
+  if (w > 0) for (let s0 = pl; s0 <= ph - w + 1e-9; s0 += 0.005){
+    const xs = [], ys = [];
+    p.x.forEach((xx, k) => { if (xx >= s0 - 1e-9 && xx <= s0 + w + 1e-9){ xs.push(xx); ys.push(p.y[k]); } });
+    if (xs.length < 0.8 * w / 0.005) continue;
+    const sl = Math.abs(linfit(xs, ys).slope);
+    if (!flat || sl < flat.sl) flat = {sl, j: ys.reduce((q, v) => q + v, 0) / ys.length, E0: s0};
+  }
+  if (flat){ out.plH = flat.j; out.plE0 = flat.E0; out.plE1 = flat.E0 + w; }
+  return out;
+}
+
+// Polarization curve (mA/cm², or j/jlim when normalized=true)
+function polMetrics(x, y, normalized){
+  const out = {};
+  const A = Math.min(val('jlA'), val('jlB')), Bv = Math.max(val('jlA'), val('jlB'));
+  let s = 0, n = 0; x.forEach((xx, i) => { if (xx >= A && xx <= Bv){ s += y[i]; n++; } });
+  if (n < 3) return out;
+  const jl = s / n;
+  if (!(jl < 0)) return out;
+  if (!normalized) out.jlim = jl;   // signed (negative for ORR)
+  const b = bins(x, y, 0.005, 'mean');
+  // E½: scanning down from the highest potential, first crossing of j_lim/2
+  const half = jl / 2;
+  for (let i = b.x.length - 1; i > 0; i--){
+    if (b.x[i] < Bv) break;
+    if ((b.y[i] - half) * (b.y[i-1] - half) <= 0 && b.y[i] !== b.y[i-1]){
+      out.e12 = b.x[i-1] + (half - b.y[i-1]) * (b.x[i] - b.x[i-1]) / (b.y[i] - b.y[i-1]); break;
+    }
+  }
+  const jk = j => j * jl / (jl - j);   // Koutecky-Levich kinetic current
+  const t0 = Math.min(val('tfLo'), val('tfHi')), t1 = Math.max(val('tfLo'), val('tfHi'));
+  const tx = [], ty = [];
+  b.x.forEach((xx, i) => { const j = b.y[i]; if (xx >= t0 && xx <= t1 && j < 0 && j > 0.95 * jl){ tx.push(Math.log10(Math.abs(jk(j)))); ty.push(xx); } });
+  if (tx.length >= 4) out.tafel = Math.abs(linfit(tx, ty).slope) * 1000;
+  if (!normalized){
+    const j9 = interp(b.x, b.y, 0.9);
+    if (j9 !== null && j9 < 0 && j9 > jl) out.sa = Math.abs(jk(j9));
+  }
+  return out;
+}
+
+async function computeMetrics(){
+  METRIC.clear();
+  const jobs = [];
+  for (const e of entries('cv')){
+    if (!isRHE(e.xu) || !isAreal(e.yu)) continue;
+    jobs.push(load(fileFor(e.r, 'cv')).then(d => {
+      const f = /^ma\/cm/i.test(e.yu.trim()) ? 1000 : 1;
+      METRIC.set(e.id, cvMetrics(d.x, f === 1 ? d.y : d.y.map(v => v * f)));
+    }).catch(() => {}));
+  }
+  for (const e of entries('pol')){
+    if (!isRHE(e.xu) || !(isAreal(e.yu) || isJlim(e.yu))) continue;
+    jobs.push(load(fileFor(e.r, 'pol')).then(d => {
+      const f = /^(u|µ)a\/cm/i.test(e.yu.trim()) ? 0.001 : 1;
+      METRIC.set(e.id, polMetrics(d.x, f === 1 ? d.y : d.y.map(v => v * f), isJlim(e.yu)));
+    }).catch(() => {}));
+  }
+  await Promise.all(jobs);
+  renderMetricRows();
+}
+
+function fmtM(k, v){ return v === undefined || v === null ? '—' : v.toFixed(METRICS[k].dp); }
+function renderMetricRows(){
+  const box = $('metricRows');
+  if (!box.childElementCount){
+    box.innerHTML = MKEYS.map(k => { const M = METRICS[k];
+      return `<div class="mrow ${M.t}Only"><span class="ml">${M.label}<small>${M.unit} · <span id="rg_${k}"></span></small></span>
+        <input type="number" id="mn_${k}" placeholder="min" step="any"><input type="number" id="mx_${k}" placeholder="max" step="any"></div>`; }).join('');
+    box.querySelectorAll('input').forEach(i => i.addEventListener('input', () => { renderList(); draw(); }));
+    document.querySelectorAll('#metricRows .cvOnly').forEach(el => el.style.display = type === 'cv' ? '' : 'none');
+    document.querySelectorAll('#metricRows .polOnly').forEach(el => el.style.display = type === 'pol' ? '' : 'none');
+  }
+  updateRanges();
+}
+// Range of each metric over datasets that pass the basic criteria (units, potential, current limits)
+function updateRanges(){
+  for (const k of MKEYS){
+    const M = METRICS[k], el = $('rg_' + k); if (!el) continue;
+    const vals = entries(M.t).filter(e => !reason(e, false)).map(e => (METRIC.get(e.id) || {})[k]).filter(v => v !== undefined);
+    el.textContent = vals.length ? `data ${Math.min(...vals).toFixed(M.dp)} to ${Math.max(...vals).toFixed(M.dp)}` : 'no data';
+  }
+}
+function metricBounds(k){ return {lo: parseFloat(($('mn_' + k) || {}).value), hi: parseFloat(($('mx_' + k) || {}).value)}; }
+
+function downloadMetrics(){
+  const keys = MKEYS.filter(k => METRICS[k].t === type);
+  const head = ['dataset', 'authors', 'year', 'doi', 'scan_rate_mV_s', ...(type === 'pol' ? ['rpm'] : []), ...keys.map(k => `${METRICS[k].label} (${METRICS[k].unit})`), 'status'];
+  const lines = [head.map(csvCell).join(',')];
+  for (const e of entries()){
+    const m = METRIC.get(e.id) || {}, rs = reason(e);
+    lines.push([e.id, e.r.authors, e.r.year, e.r.doi, num(e.scan) ?? '', ...(type === 'pol' ? [num(e.rpm) ?? ''] : []),
+      ...keys.map(k => m[k] === undefined ? '' : Number(m[k].toPrecision(6))), rs ? 'Excluded: ' + REASON_TEXT(rs, e) : 'Included'].map(csvCell).join(','));
+  }
+  const blob = new Blob(['﻿' + lines.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `pt111_${type}_metrics.csv`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 // y-axis name and unit for the current display/normalization settings
 function yLabel(){
   const tu = targetUnit(), n = normMode();
@@ -404,7 +588,7 @@ function yLabel(){
 function axisY(){ const l = yLabel(); return l.unit ? `${l.name} (${l.unit})` : l.name; }
 function unitDesc(){ const l = yLabel(); return l.unit ? l.unit : 'j / |j_lim|'; }
 
-function reason(e){
+function reason(e, withMetrics = true){
   if (!isRHE(e.xu)) return 'ref';
   if (!isAreal(e.yu) && !(normMode() === 'jlim' && isJlim(e.yu))) return 'unit';
   if (e.id.slice(0,2) === 'CV' && maxE.has(e.id)){
@@ -416,10 +600,21 @@ function reason(e){
     if (!isNaN(lo) && m < lo) return 'low';
     if (!isNaN(hi) && m > hi) return 'high';
   }
+  if (!withMetrics) return null;
+  const mt = METRIC.get(e.id) || {}, et = e.id.slice(0,2) === 'CV' ? 'cv' : 'pol';
+  for (const k of MKEYS){
+    if (METRICS[k].t !== et) continue;
+    const {lo, hi} = metricBounds(k);
+    if (isNaN(lo) && isNaN(hi)) continue;
+    if (mt[k] === undefined) return 'm_' + k;          // filter set but metric couldn't be measured
+    if ((!isNaN(lo) && mt[k] < lo) || (!isNaN(hi) && mt[k] > hi)) return 'm_' + k;
+  }
   return null;
 }
 function flagged(e){ return reason(e) !== null; }
+function boundText(k){ const {lo, hi} = metricBounds(k); return !isNaN(lo) && !isNaN(hi) ? `${lo}–${hi}` : !isNaN(lo) ? `≥ ${lo}` : `≤ ${hi}`; }
 function REASON_TEXT(rs, e){
+  if (rs.startsWith('m_')){ const k = rs.slice(2), M = METRICS[k], v = (METRIC.get(e.id) || {})[k]; return v === undefined ? `${M.short} couldn't be measured` : `${M.short} = ${fmtM(k, v)} ${M.unit}, outside ${boundText(k)}`; }
   if (rs === 'ref') return `potential vs ${e.xu.replace(/^V vs /,'')}, not RHE`;
   if (rs === 'unit') return `current in ${e.yu}, not per cm²`;
   if (rs === 'emax') return `max potential = ${maxE.get(e.id).toFixed(2)} V vs RHE, above ${$('emax').value}`;
@@ -437,7 +632,7 @@ function factor(yu){
 }
 
 // Fixed margins so every plot has the same x position/width; plot area is taller than wide
-const ASPECT = 1.15, MAXW = 560;
+const ASPECT = 1.15, MAXW = 900;
 let xRange = null;
 function dims(div){
   const W = div.clientWidth || 800, narrow = W < 820;
@@ -483,6 +678,7 @@ function openInfo(id){
     ['Scan rate', fmt(num(e.scan), 'mV/s')],
     ...(isCV ? [] : [['Rotation rate', fmt(num(e.rpm), 'rpm')]]),
     ['Units (as extracted)', esc(`${e.xu}; ${e.yu}`)],
+    ...MKEYS.filter(k => METRICS[k].t === type && METRIC.get(id) && METRIC.get(id)[k] !== undefined).map(k => [METRICS[k].label, `${fmtM(k, METRIC.get(id)[k])} ${METRICS[k].unit}`]),
     ...(maxE.has(id) ? [['Max potential', `${maxE.get(id).toFixed(3)} V vs RHE`]] : []),
     ...(maxJ.has(id) ? [['Max current density', `${maxJ.get(id).toFixed(1)} µA/cm²`]] : []),
     ['Data points', fmt(r[pre + '_n_points'])],
@@ -538,10 +734,13 @@ function linkedOut(e){
 }
 function LINK_TEXT(){ return type === 'cv' ? 'its pol curve(s) were removed' : 'its CV was removed'; }
 
-const GROUPS = ['main','manual','linked','ref','unit','nonorm','emax','low','high'];
-const CRITERIA = ['ref','unit','nonorm','emax','low','high'];
+const MGROUPS = MKEYS.map(k => 'm_' + k);
+const GROUPS = ['main','manual','linked','ref','unit','nonorm','emax','low','high', ...MGROUPS];
+const CRITERIA = ['ref','unit','nonorm','emax','low','high', ...MGROUPS];
 const manualOut = {cv: new Set(), pol: new Set()};
 function groupInfo(g){
+  if (g.startsWith('m_')){ const k = g.slice(2), M = METRICS[k];
+    return {title:`<b>Excluded: ${M.label} outside ${boundText(k)} ${M.unit} or not measurable</b>`, x:'Potential (V vs RHE)', y:axisY()}; }
   const kind = type === 'cv' ? 'CVs' : 'Polarization curves', tu = targetUnit();
   return {
     main: {title:`<b>${kind}</b> · V vs RHE, ${unitDesc()}`, x:'Potential (V vs RHE)', y:axisY()},
@@ -708,7 +907,7 @@ async function draw(){
     bindClicks(div);
     if (useGL) watchGL(div);
   }
-  const SHORT = {manual:'by you', linked:'linked', ref:'not vs RHE', unit:'not per cm²', nonorm:'can\'t normalize', emax:'high potential', low:'low current', high:'high current'};
+  const SHORT = {manual:'by you', linked:'linked', ref:'not vs RHE', unit:'not per cm²', nonorm:'can\'t normalize', emax:'high potential', low:'low current', high:'high current', ...Object.fromEntries(MKEYS.map(k => ['m_' + k, METRICS[k].short]))};
   for (const [k, sec] of Object.entries(SECTIONS)){
     const n = sec.groups.reduce((a, g) => a + (counts[g] || 0), 0);
     const parts = sec.groups.filter(g => counts[g]).map(g => `${SHORT[g]}: ${counts[g]}`);
@@ -724,7 +923,10 @@ async function draw(){
 }
 
 // Events
-['jlA','jlB'].forEach(id => $(id).addEventListener('input', () => { syncNorm(); renderList(); draw(); }));
+let mT; ['jlA','jlB','tfLo','tfHi','bfLo','bfHi','plLo','plHi','plW'].forEach(id => $(id).addEventListener('input', () => {
+  clearTimeout(mT); mT = setTimeout(async () => { await computeMetrics(); renderList(); draw(); }, 250);
+}));
+$('metricsCSV').addEventListener('click', downloadMetrics);
 for (const k in SECTIONS) $('div_' + k).addEventListener('click', () => { SECTIONS[k].open = !SECTIONS[k].open; draw(); });
 $('plots').addEventListener('click', ev => { const sp = ev.target.closest('.hlegend span'); if (sp) openInfo(sp.dataset.info); });
 $('linked').addEventListener('change', () => { renderList(); draw(); });
@@ -769,9 +971,9 @@ getText('metadata.csv').then(t => t.startsWith('ds_key') || t.startsWith('\uFEFF
   syncUnitSeg(); syncNorm();
   $('status').textContent = 'Loading curves…';
   await loadBundle();
-  if (BUNDLE) await computeMaxJ();          // instant: maxima are stored in the bundle
+  if (BUNDLE){ await computeMaxJ(); await computeMetrics(); }   // instant with the bundle
   refreshFilters(); renderList(); draw();
-  if (!BUNDLE) computeMaxJ().then(() => { renderList(); draw(); });
+  if (!BUNDLE) computeMaxJ().then(computeMetrics).then(() => { renderList(); draw(); });
 }).catch(() => {
   $('status').textContent = 'Could not load metadata.csv locally or from GitHub. Check that the repo is public.';
 });
